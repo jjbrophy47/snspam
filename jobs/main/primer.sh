@@ -1,0 +1,27 @@
+dataset=$1
+mem=$2
+time=$3
+partition=$4
+
+featureset_list=('limited' 'full')
+setting_list=('inductive' 'inductive+transductive')
+stacks_list=(0 1 2)
+joint_list=('None' 'mrf' 'psl')
+
+for featureset in ${featureset_list[@]}; do
+    for setting in ${setting_list[@]}; do
+        for stacks in ${stacks_list[@]}; do
+            for joint in ${joint_list[@]}; do
+
+                sbatch --mem=${mem}G \
+                       --time=$time \
+                       --partition=$partition \
+                       --job-name=$dataset \
+                       --output=jobs/logs/main/$dataset \
+                       --error=jobs/errors/main/$dataset \
+                       jobs/main/runner.sh $dataset \
+                       $featureset $setting $stacks $joint
+            done
+        done
+    done
+done

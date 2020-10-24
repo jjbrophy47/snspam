@@ -1,0 +1,6 @@
+**.pyc
+**.csv
+.temp
+snspam_data
+output
+psl/target
