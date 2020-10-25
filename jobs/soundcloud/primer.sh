@@ -5,7 +5,7 @@ partition=$3
 sbatch --mem=${mem}G \
        --time=$time \
        --partition=$partition \
-       --job-name=soundcloud \
-       --output=jobs/logs/soundcloud/ \
-       --error=jobs/errors/soundcloud/ \
+       --job-name=preprocess \
+       --output=jobs/logs/soundcloud/preprocess \
+       --error=jobs/errors/soundcloud/preprocess \
        jobs/soundcloud/runner.sh
