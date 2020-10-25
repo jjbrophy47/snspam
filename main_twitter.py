@@ -1,21 +1,22 @@
 """
 This script uses EGGS to model a YouTube spam dataset.
 """
+import os
 import argparse
 import numpy as np
 import pandas as pd
+from collections import defaultdict
+from datetime import datetime
 
+from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import roc_auc_score
 from sklearn.metrics import average_precision_score
+from scipy.sparse import load_npz
 
 from EGGS.eggs import EGGS
-from sklearn.linear_model import LogisticRegression
+from EGGS import print_utils
 from snspam_data.twitter.features.relational import pseudo_relational as pr
 from snspam_data.twitter.features.relational import pgm
-
-from collections import defaultdict
-from EGGS import print_utils
-from scipy.sparse import load_npz
 
 
 def main(featureset='full', setting='inductive+transductive', stacks=0, joint_model='mrf'):
@@ -25,6 +26,17 @@ def main(featureset='full', setting='inductive+transductive', stacks=0, joint_mo
     assert stacks >= 0
     assert joint_model in [None, 'mrf', 'psl']
 
+    # setup output directory
+    stacks_str = '{}'.format(stacks)
+    joint_str = joint_model if joint_model is not None else 'None'
+    out_dir = os.path.join('output', 'twitter', featureset, setting, stacks_str, joint_str)
+    os.makedirs(out_dir, exist_ok=True)
+
+    # create logger
+    logger = print_utils.get_logger(os.path.join(out_dir, 'log.txt'))
+    logger.info(args)
+    logger.info('timestamp: {}'.format(datetime.now()))
+
     # setup score containers
     scores = defaultdict(list)
     y_hats = defaultdict(list)
@@ -33,13 +45,13 @@ def main(featureset='full', setting='inductive+transductive', stacks=0, joint_mo
     # test models using cross-validation
     for fold in range(0, 10):
 
-        print('\nfold %d:' % fold)
+        logger.info('\nfold %d:' % fold)
         data_dir = 'snspam_data/twitter/processed/folds/'
         train_dir = 'snspam_data/twitter/features/independent/%s/training_data/' % featureset
         test_dir = 'snspam_data/twitter/features/independent/%s/%s/' % (featureset, setting)
 
         # read in feature data
-        print('reading in data...')
+        logger.info('reading in data...')
         X_train = load_npz('%strain_data_%d.npz' % (train_dir, fold)).tocsr()
         X_val = load_npz('%sval_data_%d.npz' % (train_dir, fold)).tocsr()
         X_test = load_npz('%stest_data_%d.npz' % (test_dir, fold)).tocsr()
@@ -78,13 +90,13 @@ def main(featureset='full', setting='inductive+transductive', stacks=0, joint_mo
 
         # train and predict for each model
         for name, model, param_grid in models:
-            print('[%s] fitting and predicting...' % name)
+            logger.info('[%s] fitting and predicting...' % name)
             model = model.fit(X_train, y_train, target_col_train, X_val, y_val, target_col_val, fold=fold)
             y_hat = model.predict_proba(X_test, target_col_test, fold=fold)[:, 1]
             y_hats[name].append(y_hat)
 
     # combine predictions from all folds and generate scores
-    print('combining predictions...')
+    logger.info('combining predictions...')
     y_true = np.hstack(y_true)
 
     for name, model, _ in models:
@@ -93,7 +105,8 @@ def main(featureset='full', setting='inductive+transductive', stacks=0, joint_mo
         for metric, scorer in metrics:
             scores[name + '|' + metric].append(scorer(y_true, y_hat))
 
-    print_utils.print_scores(scores, models, metrics)
+    df = print_utils.print_scores(scores, models, metrics, logger)
+    df.to_csv(os.path.join(out_dir, 'scores.csv'), index=None)
 
 
 if __name__ == '__main__':
