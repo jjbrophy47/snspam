@@ -10,6 +10,6 @@ python3 compute_features.py
 
 python3 link_relation.py
 
-python3 text_relation.py
+# python3 text_relation.py
 
-python3 user_relation.py
+# python3 user_relation.py
