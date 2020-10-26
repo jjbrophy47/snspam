@@ -1,5 +1,5 @@
 """
-This script uses EGGS to model a YouTube spam dataset.
+This script uses EGGS to model a SoundCloud spam dataset.
 """
 import os
 import argparse
@@ -15,8 +15,8 @@ from scipy.sparse import load_npz
 
 from EGGS.eggs import EGGS
 from EGGS import print_utils
-from snspam_data.youtube.features.relational import pseudo_relational as pr
-from snspam_data.youtube.features.relational import pgm
+from snspam_data.soundcloud.features.relational import pseudo_relational as pr
+from snspam_data.soundcloud.features.relational import pgm
 
 
 def main(featureset='full', setting='inductive+transductive', stacks=0, joint_model='mrf'):
@@ -29,7 +29,7 @@ def main(featureset='full', setting='inductive+transductive', stacks=0, joint_mo
     # setup output directory
     stacks_str = '{}'.format(stacks)
     joint_str = joint_model if joint_model is not None else 'None'
-    out_dir = os.path.join('output', 'youtube', featureset, setting, stacks_str, joint_str)
+    out_dir = os.path.join('output', 'soundcloud', featureset, setting, stacks_str, joint_str)
     os.makedirs(out_dir, exist_ok=True)
 
     # create logger
@@ -46,9 +46,9 @@ def main(featureset='full', setting='inductive+transductive', stacks=0, joint_mo
     for fold in range(0, 10):
 
         logger.info('\nfold %d:' % fold)
-        data_dir = 'snspam_data/youtube/processed/folds/'
-        train_dir = 'snspam_data/youtube/features/independent/%s/training_data/' % featureset
-        test_dir = 'snspam_data/youtube/features/independent/%s/%s/' % (featureset, setting)
+        data_dir = 'snspam_data/soundcloud/processed/folds/'
+        train_dir = 'snspam_data/soundcloud/features/independent/%s/training_data/' % featureset
+        test_dir = 'snspam_data/soundcloud/features/independent/%s/%s/' % (featureset, setting)
 
         # read in feature data
         logger.info('reading in data...')
@@ -85,7 +85,7 @@ def main(featureset='full', setting='inductive+transductive', stacks=0, joint_mo
             ('eggs', EGGS(estimator=lr,
                           sgl_method='holdout', stacks=stacks, sgl_func=pr.pseudo_relational_features,
                           joint_model=joint_model, pgm_func=pgm.create_files,
-                          relations=['text_id', 'user_id'], verbose=1), None)
+                          relations=['text_id', 'user_id', 'link_id'], verbose=2), None)
         ]
 
         # train and predict for each model
