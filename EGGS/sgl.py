@@ -13,7 +13,9 @@ class SGL:
     Stacked Graphical Learning (SGL).
     """
 
-    def __init__(self, estimator, pr_func, relations, method='cv', folds=10, stacks=2, verbose=1):
+    def __init__(self, estimator, pr_func, relations,
+                 method='cv', folds=10, stacks=2,
+                 verbose=1, logger=None):
         """
         Initialization of SGL classifier.
 
@@ -29,6 +31,10 @@ class SGL:
             Number of folds to use for the cross-validation method.
         stacks : int (default=2)
             Number of stacks to use for SGL. Only relevant if sgl is not None.
+        verbose : int (default=1)
+            Verbosity level.
+        logger : obj (default=None)
+            Logging object.
         """
         self.estimator = estimator
         self.pr_func = pr_func
@@ -37,6 +43,7 @@ class SGL:
         self.folds = folds
         self.stacks = stacks
         self.verbose = verbose
+        self.logger = logger
 
     def fit(self, X, y, target_col, fold=None):
         """Performs stacked graphical learning using the cross-validation or holdout method."""
@@ -57,14 +64,17 @@ class SGL:
         check_is_fitted(self, 'base_model_')
         check_is_fitted(self, 'stacked_models_')
 
-        if self.verbose > 0:
-            print('  predicting on test set with base model...')
+        if self.logger:
+            self.logger.info('  predicting on test set with base model...')
+
         y_hat = self.base_model_.predict_proba(Xg)[:, 1]
         Xr, Xr_cols = self.pr_func(y_hat, target_col, self.relations, fold=fold, verbose=self.verbose)
 
         for i, stacked_model in enumerate(self.stacked_models_):
-            if self.verbose > 0:
-                print('  predicting on test set with stack model %d...' % (i + 1))
+
+            if self.logger:
+                self.logger.info('  predicting on test set with stack model %d...' % (i + 1))
+
             X = utils.hstack([Xg, Xr])
             y_hat = stacked_model.predict_proba(X)[:, 1]
             Xr, Xr_cols = self.pr_func(y_hat, target_col, self.relations, fold=fold, verbose=self.verbose)
@@ -112,8 +122,8 @@ class SGL:
 
         # fit a base model, and stacked models using pseudo-relational features
         for i in range(self.stacks + 1):
-            if self.verbose > 0:
-                print('  fitting stack model %d...' % i)
+            if self.logger:
+                self.logger.info('  fitting stack model %d...' % i)
 
             X = Xg_array[i] if i == 0 else utils.hstack([Xg_array[i], pr_features[i - 1][i]])
             fit_model = clone(self.estimator).fit(X, y_array[i])
@@ -121,8 +131,8 @@ class SGL:
 
             # generate predictions for all subsequent data pieces
             for j in range(i + 1, self.stacks + 1):
-                if self.verbose > 0:
-                    print('  predicting with stack model %d for piece %d...' % (i, j))
+                if self.logger:
+                    self.logger.info('  predicting with stack model %d for piece %d...' % (i, j))
 
                 X = Xg_array[j] if i == 0 else utils.hstack([Xg_array[j], pr_features[i - 1][j]])
                 y_hat = fit_model.predict_proba(X)[:, 1]

@@ -83,7 +83,7 @@ class EGGS:
             assert self.sgl_func is not None
 
             sgl = SGL(self.estimator, self.sgl_func, self.relations, self.sgl_method,
-                      stacks=self.stacks, verbose=self.verbose)
+                      stacks=self.stacks, verbose=self.verbose, logger=self.logger)
             self.sgl_ = sgl.fit(X, y, target_col, fold=fold)
 
         else:

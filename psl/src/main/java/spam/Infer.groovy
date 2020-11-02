@@ -194,7 +194,6 @@ public class Infer {
      *@return a FullInferenceResult object.
      */
     private FullInferenceResult run_inference(closed_preds) {
-        System.out.println('inference...')
         long start = System.currentTimeMillis()
 
         Set<Predicate> closed = closed_preds.collect{this.m.getPredicate(it)}
@@ -211,7 +210,6 @@ public class Infer {
         inference_db.close()
 
         time(start)
-        System.out.println('done.')
         return result
     }
 

@@ -11,16 +11,21 @@ featureset=$2
 setting=$3
 stacks=$4
 joint=$5
+fold=$6
 
 if [ $joint == 'None' ]; then
-    python3 main_$dataset.py \
-        --featureset $featureset \
-        --setting $setting \
-        --stacks $stacks
-else
-    python3 main_$dataset.py \
+    python3 main.py \
+        --dataset $dataset \
         --featureset $featureset \
         --setting $setting \
         --stacks $stacks \
-        --joint $joint
+        --fold $fold
+else
+    python3 main.py \
+        --dataset $dataset \
+        --featureset $featureset \
+        --setting $setting \
+        --stacks $stacks \
+        --joint $joint \
+        --fold $fold
 fi

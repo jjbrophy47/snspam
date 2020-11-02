@@ -2,9 +2,13 @@
 This class handles inference using PSL.
 """
 import os
+import time
+
 import numpy as np
 import pandas as pd
 from sklearn.utils.validation import check_is_fitted
+
+from .connections import Connections
 
 
 class PSL:
@@ -12,7 +16,9 @@ class PSL:
     Class that performs inference using PSL.
     """
 
-    def __init__(self, relations, relations_func, working_dir='.temp/', psl_dir='psl/'):
+    def __init__(self, relations, relations_func,
+                 working_dir='.temp/', psl_dir='psl/',
+                 logger=None):
         """
         Initialization of joint inference class.
 
@@ -26,11 +32,14 @@ class PSL:
             Temporary directory to store intermdiate files.
         psl_dir : str (default='psl/')
             Directory where psl is installed.
+        logger : obj (default=None)
+            Logs output.
         """
         self.relations = relations
         self.relations_func = relations_func
         self.working_dir = working_dir
         self.psl_dir = psl_dir
+        self.logger = logger
         self.compiled_ = False
 
     # public
@@ -42,10 +51,16 @@ class PSL:
             target_col: list of target_ids. shape: (n_samples,).
         """
 
+        start = time.time()
+
         target_priors, relations_dict, target_name = self.relations_func(y_hat, target_col, self.relations, fold=fold)
         self._generate_files(target_priors, relations_dict, target_name=target_name, y_true=y)
         self._train(target_name, target_col, y_hat, y)
         self.fitted_ = True
+
+        if self.logger:
+            self.logger.info('time: {:.3f}s'.format(time.time() - start))
+
         return self
 
     def inference(self, y_hat, target_col, fold=None):
@@ -57,12 +72,13 @@ class PSL:
 
         check_is_fitted(self, 'fitted_')
         target_priors, relations_dict, target_name = self.relations_func(y_hat, target_col, self.relations, fold=fold)
-        self._generate_files(target_priors, relations_dict, target_name=target_name)
-        y_hat = self._inference(target_name, target_col, y_hat)
-        return y_hat
+
+        y_score = self.infer(target_priors, relations_dict)
+
+        return y_score
 
     # private
-    def _generate_files(self, target_priors, relations_dict, target_name='user_id', y_true=None):
+    def _generate_files(self, target_priors, relations_dict, target_name='com_id', y_true=None):
         """
         Generates predicate files for PSL.
             target_priors: list of (target_id, prior) tuples.
@@ -70,7 +86,6 @@ class PSL:
         """
 
         # generate target files
-        print('n_msgs: {:,}'.format(len(target_priors)))
         nolabel_fname = '%s%s_nolabel.tsv' % (self.working_dir, target_name)
         prior_fname = '%s%s_prior.tsv' % (self.working_dir, target_name)
         target_df = pd.DataFrame(target_priors, columns=[target_name, 'y_hat'])
@@ -102,6 +117,45 @@ class PSL:
         for relation_id in self.relations:
             rules += self._map_relation_to_rules(relation_id)
         self._write_rules(rules)
+
+    def infer(self, target_priors, relations_dict, max_size=7500, max_edges=40000):
+
+        conns_obj = Connections()
+        df = pd.DataFrame(target_priors, columns=['com_id', 'ind_pred'])
+
+        g, subnets = conns_obj.find_subgraphs(df, relations_dict, max_size, max_edges, logger=self.logger)
+        subgraphs = conns_obj.consolidate(subnets, max_size, logger=self.logger)
+
+        results = []
+        for i, (ids, hubs, rels, edges) in enumerate(subgraphs):
+            start = time.time()
+
+            sg_ids = [int(x) for x in ids]
+            temp_df = df[df['com_id'].isin(sg_ids)]
+            sg_priors = list(zip(temp_df['com_id'], temp_df['ind_pred']))
+
+            target_col, y_hat = temp_df['com_id'].values, temp_df['ind_pred'].values
+
+            self._generate_files(sg_priors, relations_dict, target_name='com_id')
+            y_score = self._inference('com_id', target_col, y_hat)
+            result_df = pd.DataFrame(list(zip(target_col, y_score[:, 1])), columns=['com_id', 'pgm_pred'])
+
+            results.append(result_df)
+
+            if self.logger:
+                s = 'reasoning over sg_{} with {:,} msgs and {:,} edges...{:.3f}s'
+                self.logger.info(s.format(i, len(ids), edges, time.time() - start))
+
+        preds_df = pd.concat(results)
+        preds_df = preds_df.groupby('com_id')['pgm_pred'].mean().reset_index()
+
+        result_df = df.merge(preds_df, on='com_id', how='left')
+        result_df['pgm_pred'] = result_df['pgm_pred'].fillna(result_df['ind_pred'])
+
+        y_score = np.array(result_df['pgm_pred'].values)
+        y_score = np.hstack([1 - y_score.reshape(-1, 1), y_score.reshape(-1, 1)])
+
+        return y_score
 
     # def infer(self, df, psl_d, psl_f, rel_d, max_size=500000):
     #     fold = self.config_obj.fold

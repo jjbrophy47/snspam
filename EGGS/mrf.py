@@ -19,7 +19,8 @@ class MRF:
     """
 
     def __init__(self, relations, relations_func, working_dir='.temp/', verbose=0,
-                 epsilon=[0.05], scoring=None, logger=None):
+                 scoring=None, logger=None,
+                 epsilon=[0.05, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45]):
         """
         Initialization of the MRF model.
 
@@ -58,9 +59,6 @@ class MRF:
             target_col: list of target_ids. shape: (n_samples,).
         """
 
-        if self.logger:
-            self.logger.info('\nTRAINING\n')
-
         relation_epsilons = {}
         self.relation_epsilons_ = {}
 
@@ -80,7 +78,7 @@ class MRF:
 
                 y_score = self.infer(target_priors, relation_dict, ep=epsilon)
 
-                metric_score = self.scoring(y, y_score)
+                metric_score = self.scoring(y, y_score[:, 1])
                 scores.append((metric_score, epsilon))
 
                 if self.logger:
@@ -92,7 +90,7 @@ class MRF:
         self.relation_epsilons_ = relation_epsilons
 
         if self.logger:
-            self.logger.info('[MRF]: epsilons: {}' % self.relation_epsilons_)
+            self.logger.info('[MRF]: epsilons: {}'.format(self.relation_epsilons_))
 
         return self
 
@@ -102,16 +100,11 @@ class MRF:
             y_hat: priors for target nodes.
             target_col: list of target_ids.
         """
-        if self.logger:
-            self.logger.info('\nINFERENCE\n')
 
         check_is_fitted(self, 'relation_epsilons_')
         target_priors, relations_dict, target_name = self.relations_func(y_hat, target_col, self.relations, fold=fold)
 
         y_score = self.infer(target_priors, relations_dict)
-
-        # targets_dict, relation_dicts = self._generate_mn(target_priors, relations_dict, target_name=target_name)
-        # y_score = self._inference(targets_dict, relation_dicts)
 
         return y_score
 
@@ -149,6 +142,7 @@ class MRF:
         result_df['pgm_pred'] = result_df['pgm_pred'].fillna(result_df['ind_pred'])
 
         y_score = np.array(result_df['pgm_pred'].values)
+        y_score = np.hstack([1 - y_score.reshape(-1, 1), y_score.reshape(-1, 1)])
 
         return y_score
 
@@ -197,7 +191,7 @@ class MRF:
         aupr = average_precision_score(df['label'], df['mrf_pred'])
         return aupr
 
-    def _generate_mn(self, target_priors, relations_dict, ep=0.1, eps={}, target_name='user_id'):
+    def _generate_mn(self, target_priors, relations_dict, ep=0.1, eps={}, target_name='com_id'):
         """
         Generates predicate files for PSL.
             target_priors: list of (target_id, prior) tuples.
