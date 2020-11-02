@@ -17,7 +17,8 @@ class EGGS:
     """
 
     def __init__(self, estimator, sgl_method=None, stacks=2, joint_model=None,
-                 relations=None, sgl_func=None, pgm_func=None, validation_size=0.2, verbose=0):
+                 relations=None, sgl_func=None, pgm_func=None, validation_size=0.2,
+                 verbose=0, logger=None):
         """
         Initialization of EGGS classifier.
 
@@ -41,6 +42,8 @@ class EGGS:
             Percentage of training data to use to train a PGM model.
         verbose : int (default=1)
             Prints debugging information, higher outputs the higher verbose is.
+        logger : obj (default=None)
+            Logs output.
         """
         self.estimator = estimator
         self.sgl_method = sgl_method
@@ -51,6 +54,7 @@ class EGGS:
         self.pgm_func = pgm_func
         self.validation_size = validation_size
         self.verbose = verbose
+        self.logger = logger
 
     def __str__(self):
         return '%s' % self.get_params()
@@ -93,7 +97,7 @@ class EGGS:
             else:
                 y_hat_val = self.clf_.predict_proba(X_val)
 
-            joint = Joint(self.relations, self.pgm_func, pgm_type=self.joint_model)
+            joint = Joint(self.relations, self.pgm_func, pgm_type=self.joint_model, logger=self.logger)
             self.joint_ = joint.fit(y_val, y_hat_val[:, 1], target_col_val, fold=fold)
 
         return self

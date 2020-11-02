@@ -78,14 +78,14 @@ def main(featureset='full', setting='inductive+transductive', stacks=0, joint_mo
         y_true.append(y_test)
 
         # setup hyperparameters, metrics, and models
-        lr = LogisticRegression(solver='liblinear')
+        lr = LogisticRegression(solver='liblinear', C=1000, class_weight='balanced', random_state=1)
         metrics = [('roc_auc', roc_auc_score), ('aupr', average_precision_score)]
         models = [
             ('lr', EGGS(estimator=lr), None),
             ('eggs', EGGS(estimator=lr,
                           sgl_method='holdout', stacks=stacks, sgl_func=pr.pseudo_relational_features,
                           joint_model=joint_model, pgm_func=pgm.create_files,
-                          relations=['text_id', 'user_id'], verbose=1), None)
+                          relations=['text_id', 'user_id'], verbose=1, logger=logger), None)
         ]
 
         # train and predict for each model

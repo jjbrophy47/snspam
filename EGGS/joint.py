@@ -14,7 +14,9 @@ class Joint:
     High-level class with multiple pgm implementations.
     """
 
-    def __init__(self, relations, relations_func, pgm_type='psl', working_dir='.temp/'):
+    def __init__(self, relations, relations_func,
+                 pgm_type='psl', working_dir='.temp/',
+                 logger=None):
         """
         Initialization of joint inference class.
 
@@ -28,11 +30,14 @@ class Joint:
             Type of PGM to use for joint inference.
         working_dir : str (default='.temp/')
             Temporary directory to store intermediate files.
+        logger : obj (default=None)
+            Logs output.
         """
         self.relations = relations
         self.relations_func = relations_func
         self.pgm_type = pgm_type
         self.working_dir = working_dir + str(uuid.uuid4()) + '/'
+        self.logger = logger
 
         # clear the working directory
         if os.path.exists(self.working_dir):
@@ -47,8 +52,9 @@ class Joint:
         """
 
         pgm_class = PSL if self.pgm_type == 'psl' else MRF
-        pgm = pgm_class(self.relations, self.relations_func, self.working_dir)
+        pgm = pgm_class(self.relations, self.relations_func, self.working_dir, logger=self.logger)
         self.pgm_ = pgm.fit(y, y_hat, target_col, fold=fold)
+
         return self
 
     def inference(self, y_hat, target_col, fold=None):

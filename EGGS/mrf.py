@@ -2,11 +2,15 @@
 This class handles loopy belief propagation using Libra.
 """
 import os
+import time
 import math
+
 import numpy as np
 import pandas as pd
 from sklearn.metrics import average_precision_score
 from sklearn.utils.validation import check_is_fitted
+
+from .connections import Connections
 
 
 class MRF:
@@ -15,7 +19,7 @@ class MRF:
     """
 
     def __init__(self, relations, relations_func, working_dir='.temp/', verbose=0,
-                 epsilon=[0.05], scoring=None):
+                 epsilon=[0.05], scoring=None, logger=None):
         """
         Initialization of the MRF model.
 
@@ -31,6 +35,8 @@ class MRF:
             Epsilon values to try for each relation during training.
         scoring : str (default='aupr')
             Method of scoring to use for model selection during training.
+        logger : obj (default=None)
+            Logs output.
         """
         self.relations = relations
         self.working_dir = working_dir
@@ -38,6 +44,7 @@ class MRF:
         self.epsilon = epsilon
         self.scoring = scoring
         self.verbose = verbose
+        self.logger = logger
 
         if scoring is None:
             self.scoring = average_precision_score
@@ -52,27 +59,36 @@ class MRF:
         """
 
         relation_epsilons = {}
+        self.relation_epsilons_ = {}
 
         # test each relation individually
         target_priors, relations_dict, target_name = self.relations_func(y_hat, target_col, self.relations, fold=fold)
+
         for relation_type, connections_list in relations_dict.items():
             relation_dict = {relation_type: connections_list}
+
+            if self.logger:
+                self.logger.info('\nRELATION {}'.format(relation_type))
 
             # test different epsilon values for this relation
             scores = []
             for epsilon in self.epsilon:
-                print('epsilon: %.2f...' % epsilon)
-                targets_dict, relation_dicts = self._generate_mn(target_priors, relation_dict,
-                                                                 ep=epsilon, target_name=target_name)
-                y_score = self._inference(targets_dict, relation_dicts)
-                metric_score = self.scoring(y, y_score[:, 1])
+                start = time.time()
+
+                y_score = self.infer(target_priors, relation_dict, ep=epsilon)
+
+                metric_score = self.scoring(y, y_score)
                 scores.append((metric_score, epsilon))
 
-            relation_epsilons[relation_type] = sorted(scores, reverse=True)[0][1]
-        self.relation_epsilons_ = relation_epsilons
+                if self.logger:
+                    s = '[EPSILON {:.2f}] score: {:.3f}...{:.3f}s'
+                    self.logger.info(s.format(epsilon, metric_score, time.time() - start))
 
-        if self.verbose > 0:
-            print('[MRF]: epsilons: %s' % self.relation_epsilons_)
+            relation_epsilons[relation_type] = sorted(scores, reverse=True)[0][1]
+
+        self.relation_epsilons_[relation_type] = relation_epsilons
+        if self.logger:
+            self.logger.info('[MRF]: epsilons: %s' % self.relation_epsilons_)
 
         return self
 
@@ -82,40 +98,81 @@ class MRF:
             y_hat: priors for target nodes.
             target_col: list of target_ids.
         """
-
-        print('inference...')
+        if self.logger:
+            self.logger.info('inference...')
         check_is_fitted(self, 'relation_epsilons_')
         target_priors, relations_dict, target_name = self.relations_func(y_hat, target_col, self.relations, fold=fold)
-        targets_dict, relation_dicts = self._generate_mn(target_priors, relations_dict, target_name=target_name)
-        y_score = self._inference(targets_dict, relation_dicts)
+
+        y_score = self.infer(target_priors, relations_dict)
+
+        # targets_dict, relation_dicts = self._generate_mn(target_priors, relations_dict, target_name=target_name)
+        # y_score = self._inference(targets_dict, relation_dicts)
+
         return y_score
 
-    def infer(self, df, mrf_f, rel_pred_f, ep=0.1, max_size=7500, max_edges=40000, dset='test'):
-        fold = self.config_obj.fold
-        relations = self.config_obj.relations
-        epsilons = self.config_obj.epsilons
+    def infer(self, target_priors, relations_dict, ep=0.1, max_size=7500, max_edges=40000):
 
-        g, subnets = self.conns_obj.find_subgraphs(df, relations, max_size,
-                                                   max_edges)
-        subgraphs = self.conns_obj.consolidate(subnets, max_size)
+        conns_obj = Connections()
+        df = pd.DataFrame(target_priors, columns=['com_id', 'ind_pred'])
 
-        res_dfs, rel_margs = [], {}
+        g, subnets = conns_obj.find_subgraphs(df, relations_dict, max_size, max_edges, logger=self.logger)
+        subgraphs = conns_obj.consolidate(subnets, max_size, logger=self.logger)
+
+        results = []
         for i, (ids, hubs, rels, edges) in enumerate(subgraphs):
-            s = 'reasoning over sg_%d with %d msgs and %d edges...'
-            t1 = self.util_obj.out(s % (i, len(ids), edges))
-            sg_df = df[df['com_id'].isin(ids)]
-            md, rd = self._gen_mn(sg_df, dset, mrf_f, ep, eps=epsilons)
-            self._run(mrf_f, dset=dset)
-            res_df, r_margs = self._process_marginals(md, rd, mrf_f, dset=dset,
-                                                      pred_dir=rel_pred_f)
-            res_dfs.append(res_df)
-            rel_margs.update(r_margs)
-            self.util_obj.time(t1)
-        preds_df = pd.concat(res_dfs)
-        preds_df = preds_df.groupby('com_id')['mrf_pred'].mean().reset_index()
-        preds_df.to_csv(rel_pred_f + 'mrf_preds_' + fold + '.csv', index=None)
+            start = time.time()
 
-        return res_df
+            sg_ids = [int(x) for x in ids]
+            temp_df = df[df['com_id'].isin(sg_ids)]
+            sg_priors = list(zip(temp_df['com_id'], temp_df['ind_pred']))
+
+            td, rd = self._generate_mn(sg_priors, relations_dict,
+                                       ep=ep, eps=self.relation_epsilons_,
+                                       target_name='com_id')
+            result_df = self._inference(td, rd)
+
+            results.append(result_df)
+
+            if self.logger:
+                s = 'reasoning over sg_{} with {} msgs and {} edges...{:.3f}s'
+                self.logger.info(s.format(i, len(ids), edges, time.time() - start))
+
+        preds_df = pd.concat(results)
+        preds_df = preds_df.groupby('com_id')['pgm_pred'].mean().reset_index()
+
+        result_df = df.merge(preds_df, on='com_id', how='left')
+        result_df['pgm_pred'] = result_df['pgm_pred'].fillna(result_df['ind_pred'])
+
+        y_score = np.array(result_df['pgm_pred'].values)
+
+        return y_score
+
+    # def infer(self, df, mrf_f, rel_pred_f, ep=0.1, max_size=7500, max_edges=40000, dset='test'):
+    #     fold = self.config_obj.fold
+    #     relations = self.config_obj.relations
+    #     epsilons = self.config_obj.epsilons
+
+    #     g, subnets = self.conns_obj.find_subgraphs(df, relations, max_size,
+    #                                                max_edges)
+    #     subgraphs = self.conns_obj.consolidate(subnets, max_size)
+
+    #     res_dfs, rel_margs = [], {}
+    #     for i, (ids, hubs, rels, edges) in enumerate(subgraphs):
+    #         s = 'reasoning over sg_%d with %d msgs and %d edges...'
+    #         t1 = self.util_obj.out(s % (i, len(ids), edges))
+    #         sg_df = df[df['com_id'].isin(ids)]
+    #         md, rd = self._gen_mn(sg_df, dset, mrf_f, ep, eps=epsilons)
+    #         self._run(mrf_f, dset=dset)
+    #         res_df, r_margs = self._process_marginals(md, rd, mrf_f, dset=dset,
+    #                                                   pred_dir=rel_pred_f)
+    #         res_dfs.append(res_df)
+    #         rel_margs.update(r_margs)
+    #         self.util_obj.time(t1)
+    #     preds_df = pd.concat(res_dfs)
+    #     preds_df = preds_df.groupby('com_id')['mrf_pred'].mean().reset_index()
+    #     preds_df.to_csv(rel_pred_f + 'mrf_preds_' + fold + '.csv', index=None)
+
+    #     return res_df
 
     # private
     def _inference(self, targets_dict, relation_dicts):
@@ -126,7 +183,9 @@ class MRF:
         os.system(execute)
 
         targets, y_score = self._marginals(targets_dict, relation_dicts)
-        return y_score
+        df = pd.DataFrame(list(zip(targets, y_score[:, 1])), columns=['com_id', 'pgm_pred'])
+
+        return df
 
     def _compute_aupr(self, preds_df, val_df):
         df = preds_df.merge(val_df, on='com_id', how='left')
