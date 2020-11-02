@@ -58,6 +58,9 @@ class MRF:
             target_col: list of target_ids. shape: (n_samples,).
         """
 
+        if self.logger:
+            self.logger.info('\nTRAINING\n')
+
         relation_epsilons = {}
         self.relation_epsilons_ = {}
 
@@ -86,9 +89,10 @@ class MRF:
 
             relation_epsilons[relation_type] = sorted(scores, reverse=True)[0][1]
 
-        self.relation_epsilons_[relation_type] = relation_epsilons
+        self.relation_epsilons_ = relation_epsilons
+
         if self.logger:
-            self.logger.info('[MRF]: epsilons: %s' % self.relation_epsilons_)
+            self.logger.info('[MRF]: epsilons: {}' % self.relation_epsilons_)
 
         return self
 
@@ -99,7 +103,8 @@ class MRF:
             target_col: list of target_ids.
         """
         if self.logger:
-            self.logger.info('inference...')
+            self.logger.info('\nINFERENCE\n')
+
         check_is_fitted(self, 'relation_epsilons_')
         target_priors, relations_dict, target_name = self.relations_func(y_hat, target_col, self.relations, fold=fold)
 

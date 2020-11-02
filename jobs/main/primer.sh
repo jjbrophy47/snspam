@@ -8,6 +8,11 @@ setting_list=('inductive' 'inductive+transductive')
 stacks_list=(0 1 2)
 joint_list=('None' 'mrf' 'psl')
 
+featureset_list=('limited')
+setting_list=('inductive')
+stacks_list=(0)
+joint_list=('mrf')
+
 for featureset in ${featureset_list[@]}; do
     for setting in ${setting_list[@]}; do
         for stacks in ${stacks_list[@]}; do
