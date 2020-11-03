@@ -118,7 +118,7 @@ class PSL:
             rules += self._map_relation_to_rules(relation_id)
         self._write_rules(rules)
 
-    def infer(self, target_priors, relations_dict, max_size=7500, max_edges=40000):
+    def infer(self, target_priors, relations_dict, max_size=40000, max_edges=40000):
 
         conns_obj = Connections()
         df = pd.DataFrame(target_priors, columns=['com_id', 'ind_pred'])
