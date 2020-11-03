@@ -111,6 +111,7 @@ def main(args):
     logger.info('train time: {:.3f}s'.format(time.time() - start))
 
     # predict
+    start = time.time()
     logger.info('\nTESTING\n')
     y_hat = model.predict_proba(X_test, target_col_test, fold=args.fold)[:, 1]
     logger.info('test time: {:.3f}s'.format(time.time() - start))

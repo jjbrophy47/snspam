@@ -39,7 +39,7 @@ def main(featureset='full', setting='inductive+transductive', stacks=0, joint_mo
 
     # combine predictions from all folds
     for fold in args.fold:
-        logger.info('\nfold %d:' % fold)
+        logger.info('getting predictions from fold {}...'.format(fold))
 
         in_dir = os.path.join('output', 'youtube', 'rs{}'.format(args.rs),
                               'fold{}'.format(fold), featureset, setting,

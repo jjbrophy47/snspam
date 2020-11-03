@@ -5,6 +5,7 @@
 module load python3/3.7.5
 module load libra/1.1.2
 module load java/1.8.0
+module load maven/3.5.0
 
 dataset=$1
 featureset=$2
