@@ -40,7 +40,7 @@ class PSL:
         self.working_dir = working_dir
         self.psl_dir = psl_dir
         self.logger = logger
-        self.compiled_ = False
+        self.compiled_ = True
 
     # public
     def fit(self, y, y_hat, target_col, fold=None):
@@ -181,6 +181,7 @@ class PSL:
         execute = 'java -Xmx60g -cp ./target/classes:`cat classpath.out` '
         execute += 'spam.Infer' + ' ' + ' '.join(arg_list)
 
+        # only need to do this once
         self._compile()
 
         cwd = os.getcwd()
