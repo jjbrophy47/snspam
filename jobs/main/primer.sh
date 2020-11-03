@@ -11,7 +11,7 @@ joint_list=('None' 'mrf' 'psl')
 featureset_list=('limited')
 setting_list=('inductive')
 stacks_list=(0)
-joint_list=('psl')
+joint_list=('mrf')
 fold_list=(0 1 2 3 4 5 6 7 8 9)
 
 for fold in ${fold_list[@]}; do
