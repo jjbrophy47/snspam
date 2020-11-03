@@ -20,7 +20,7 @@ class MRF:
 
     def __init__(self, relations, relations_func, working_dir='.temp/', verbose=0,
                  scoring=None, logger=None,
-                 epsilon=[0.05, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45]):
+                 epsilon=[0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45]):
         """
         Initialization of the MRF model.
 
@@ -69,21 +69,22 @@ class MRF:
             relation_dict = {relation_type: connections_list}
 
             if self.logger:
-                self.logger.info('\nRELATION {}'.format(relation_type))
+                self.logger.info('RELATION {}'.format(relation_type))
 
             # test different epsilon values for this relation
             scores = []
             for epsilon in self.epsilon:
-                start = time.time()
+                if self.logger:
+                    self.logger.info('\nEPSILON {:.2f}'.format(epsilon))
 
+                start = time.time()
                 y_score = self.infer(target_priors, relation_dict, ep=epsilon)
 
                 metric_score = self.scoring(y, y_score[:, 1])
                 scores.append((metric_score, epsilon))
 
                 if self.logger:
-                    s = '[EPSILON {:.2f}] score: {:.3f}...{:.3f}s'
-                    self.logger.info(s.format(epsilon, metric_score, time.time() - start))
+                    self.logger.info('score: {:.3f}...{:.3f}s'.format(metric_score, time.time() - start))
 
             relation_epsilons[relation_type] = sorted(scores, reverse=True)[0][1]
 
