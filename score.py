@@ -72,7 +72,7 @@ if __name__ == '__main__':
     parser.add_argument('--featureset', default='full', help='independent features, default: %(default)s')
     parser.add_argument('--setting', default='inductive+transductive', help='network setting, default: %(default)s')
     parser.add_argument('--stacks', default=0, type=int, help='number of SGL stacks, default: %(default)s')
-    parser.add_argument('--joint', default=None, help='joint inference model (mrf or psl), default: %(default)s')
+    parser.add_argument('--joint', default=None, type=str, help='joint model (mrf or psl), default: %(default)s')
     parser.add_argument('--fold', default=list(range(10)), type=int, nargs='+', help='dataset partitions.')
     parser.add_argument('--rs', default=1, type=int, help='random state.')
     args = parser.parse_args()
