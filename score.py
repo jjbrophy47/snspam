@@ -1,5 +1,6 @@
 """
-This script uses EGGS to model a YouTube spam dataset.
+Concatenates predictions from all ten folds and
+computes the score.
 """
 import os
 import argparse
@@ -23,7 +24,7 @@ def main(featureset='full', setting='inductive+transductive', stacks=0, joint_mo
     # setup output directory
     stacks_str = '{}'.format(stacks)
     joint_str = joint_model if joint_model is not None else 'None'
-    out_dir = os.path.join('output', 'scores', 'youtube',
+    out_dir = os.path.join('output', 'scores', args.dataset,
                            'rs{}'.format(args.rs), featureset, setting,
                            stacks_str, joint_str)
     os.makedirs(out_dir, exist_ok=True)
@@ -41,7 +42,7 @@ def main(featureset='full', setting='inductive+transductive', stacks=0, joint_mo
     for fold in args.fold:
         logger.info('getting predictions from fold {}...'.format(fold))
 
-        in_dir = os.path.join('output', 'youtube', 'rs{}'.format(args.rs),
+        in_dir = os.path.join('output', args.dataset, 'rs{}'.format(args.rs),
                               'fold{}'.format(fold), featureset, setting,
                               stacks_str, joint_str)
 
@@ -67,6 +68,7 @@ if __name__ == '__main__':
 
     # read in commandline args
     parser = argparse.ArgumentParser(description='EGGS: Extended Group-based Graphical models for Spam', prog='run')
+    parser.add_argument('--dataset', default='youtube', help='dataset to score, default: %(default)s')
     parser.add_argument('--featureset', default='full', help='independent features, default: %(default)s')
     parser.add_argument('--setting', default='inductive+transductive', help='network setting, default: %(default)s')
     parser.add_argument('--stacks', default=0, type=int, help='number of SGL stacks, default: %(default)s')
